@@ -15,7 +15,7 @@
 
 ## 界面展示
 
-![API查询工具界面](./screenshot.png)
+![API查询工具界面](https://github.com/user-attachments/assets/eb0b716f-8f95-4e94-8a4a-2a6dd07288d3)
 
 ## 使用方法
 
