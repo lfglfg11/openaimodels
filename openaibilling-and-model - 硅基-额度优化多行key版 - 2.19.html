@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>API 查询工具</title>
+    <style>
+        /* 样式保持不变 */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #2c3e50;
+        }
+        input[type="text"], textarea {
+            width: 50%;
+            padding: 8px;
+            margin: 5px auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            display: block;
+            text-align: center;
+            position: relative;
+        }
+        textarea {
+            height: 68px;
+            resize: vertical;
+        }
+        .editable-dropdown {
+            position: relative;
+            width: 50%;
+            margin: 5px auto;
+        }
+        .editable-dropdown input,
+        .editable-dropdown textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .editable-dropdown .dropdown-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .dropdown {
+            position: absolute;
+            width: 100%;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-top: none;
+            z-index: 1000;
+            display: none;
+            left: 0;
+        }
+        .dropdown div {
+            padding: 8px;
+            cursor: pointer;
+            text-align: center; /* 选项居中 */
+        }
+        .dropdown div:hover {
+            background-color: #f2f2f2;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        button {
+            display: block;
+            width: 200px;
+            padding: 10px;
+            margin: 20px auto;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .model-category {
+            margin-top: 10px;
+        }
+        .model-category h3 {
+            text-align: left;
+        }
+        .model-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .model-item {
+            background-color: #e7f2fa;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-bottom: 2px;
+        }
+        .model-item:hover {
+            background-color: #d0e5f5;
+        }
+        #copyNotification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>API万能查询-支持Siliconflow</h1>
+
+        <label for="apiUrlInput">API请求URL：(格式:https://api.openai.com)</label>
+        <div class="editable-dropdown">
+            <input type="text" id="apiUrlInput" placeholder="请输入API请求URL" autocomplete="off">
+            <div class="dropdown-icon" id="urlDropdownIcon">&#9660;</div>
+            <div id="urlDropdown" class="dropdown"></div>
+        </div>
+
+        <label for="apiKeyInput">API密钥(多个密钥请用回车分隔)：</label>
+        <div class="editable-dropdown">
+            <textarea id="apiKeyInput" placeholder="请输入你的API Key，多个密钥请用回车分隔"></textarea>
+            <div class="dropdown-icon" id="keyDropdownIcon">&#9660;</div>
+            <div id="keyDropdown" class="dropdown"></div>
+        </div>
+
+        <button id="queryBtn">查询余额和模型列表</button>
+        <div id="result"></div>
+        <div id="modelList"></div>
+    </div>
+    <div id="copyNotification">已复制到剪贴板</div>
+
+    <script>
+        $(document).ready(function() {
+            // 预设选项
+            var predefinedUrls = [
+                { value: "https://api.openai.com", text: "官方通道 https://api.openai.com" },
+                { value: "https://api.openai-proxy.com", text: "反代通道 https://api.openai-proxy.com" },
+                { value: "https://api.xbyjs.top", text: "小北API通道 https://api.xbyjs.top" },
+                { value: "https://api.siliconflow.cn", text: "硅基通道 https://api.siliconflow.cn" }
+            ];
+
+            // 读取并设置API请求URL
+            var savedUrl = localStorage.getItem('apiUrl') || 'https://api.openai.com';
+            $('#apiUrlInput').val(savedUrl);
+
+            // 读取并设置API密钥
+            $('#apiKeyInput').val(localStorage.getItem('apiKeys') || '');
+
+            // 显示URL下拉列表
+            function showUrlDropdown() {
+                var storedUrls = JSON.parse(localStorage.getItem('storedUrls')) || [];
+                var dropdown = $('#urlDropdown');
+                dropdown.empty();
+
+                // 组合预设选项和历史记录
+                var allUrls = predefinedUrls.map(u => u.value);
+                allUrls = allUrls.concat(storedUrls.filter(u => !allUrls.includes(u)));
+
+                allUrls.forEach(function(url) {
+                    dropdown.append('<div>' + url + '</div>');
+                });
+
+                // 显示下拉列表
+                dropdown.show();
+            }
+
+            $('#apiUrlInput').on('focus', function() {
+                showUrlDropdown();
+            });
+
+            $('#urlDropdownIcon').on('click', function() {
+                showUrlDropdown();
+            });
+
+            $('#apiUrlInput').on('input', function() {
+                localStorage.setItem('apiUrl', $(this).val());
+            });
+
+            $('#apiUrlInput').on('blur', function() {
+                setTimeout(function() {
+                    $('#urlDropdown').hide();
+                }, 200); // 延迟隐藏以便点击选项
+                // 保存URL到历史记录
+                var storedUrls = JSON.parse(localStorage.getItem('storedUrls')) || [];
+                var newUrl = $('#apiUrlInput').val().trim();
+                if (newUrl !== '' && !storedUrls.includes(newUrl) && !predefinedUrls.some(u => u.value === newUrl)) {
+                    storedUrls.push(newUrl);
+                    localStorage.setItem('storedUrls', JSON.stringify(storedUrls));
+                }
+                localStorage.setItem('apiUrl', newUrl);
+            });
+
+            // 点击URL下拉选项
+            $('#urlDropdown').on('click', 'div', function() {
+                $('#apiUrlInput').val($(this).text());
+                $('#urlDropdown').hide();
+            });
+
+            // 显示Key下拉列表
+            function showKeyDropdown() {
+                var storedKeys = JSON.parse(localStorage.getItem('storedKeys')) || [];
+                var dropdown = $('#keyDropdown');
+                dropdown.empty();
+
+                storedKeys.forEach(function(key) {
+                    dropdown.append('<div>' + key + '</div>');
+                });
+
+                // 显示下拉列表
+                if (storedKeys.length > 0) {
+                    dropdown.show();
+                }
+            }
+
+            $('#apiKeyInput').on('focus', function() {
+                showKeyDropdown();
+            });
+
+            $('#keyDropdownIcon').on('click', function() {
+                showKeyDropdown();
+            });
+
+            $('#apiKeyInput').on('input', function() {
+                localStorage.setItem('apiKeys', $(this).val());
+            });
+
+            $('#apiKeyInput').on('blur', function() {
+                setTimeout(function() {
+                    $('#keyDropdown').hide();
+                }, 200); // 延迟隐藏以便点击选项
+                // 保存Key到历史记录
+                var storedKeys = JSON.parse(localStorage.getItem('storedKeys')) || [];
+                var newKeys = $('#apiKeyInput').val().split('\n').filter(key => key.trim() !== '');
+                newKeys.forEach(function(key) {
+                    if (!storedKeys.includes(key)) {
+                        storedKeys.push(key);
+                    }
+                });
+                localStorage.setItem('storedKeys', JSON.stringify(storedKeys));
+                localStorage.setItem('apiKeys', $('#apiKeyInput').val());
+            });
+
+            // 点击Key下拉选项
+            $('#keyDropdown').on('click', 'div', function() {
+                var key = $(this).text();
+                var existingKeys = $('#apiKeyInput').val().split('\n').filter(k => k.trim() !== '');
+                if (!existingKeys.includes(key)) {
+                    existingKeys.push(key);
+                    $('#apiKeyInput').val(existingKeys.join('\n'));
+                }
+                $('#keyDropdown').hide();
+            });
+
+            $('#queryBtn').click(function() {
+                var apiKeys = $('#apiKeyInput').val().split('\n').filter(key => key.trim() !== '');
+                var baseUrl = $('#apiUrlInput').val().trim();
+
+                // 保存最新的URL和API密钥
+                localStorage.setItem('apiUrl', baseUrl);
+                localStorage.setItem('apiKeys', $('#apiKeyInput').val());
+
+                var resultHtml = "<h2>余额查询结果</h2>";
+                var promises = [];
+
+                apiKeys.forEach(function(apiKey, index) {
+                    var headers = {
+                        'Authorization': 'Bearer ' + apiKey.trim(),
+                        'Content-Type': 'application/json'
+                    };
+
+                    if (baseUrl === 'https://api.siliconflow.cn' || baseUrl === 'https://api.siliconflow.com') {
+                        promises.push(querySiliconFlowBalance(baseUrl, headers, index + 1));
+                    } else {
+                        promises.push(queryOpenAIBalance(baseUrl, headers, index + 1));
+                    }
+                });
+
+                Promise.all(promises).then(function(results) {
+                    resultHtml += results.join('');
+                    $('#result').html(resultHtml);
+                });
+
+                // 查询模型列表（使用第一个API密钥）
+                if (apiKeys.length > 0) {
+                    var headers = {
+                        'Authorization': 'Bearer ' + apiKeys[0].trim(),
+                        'Content-Type': 'application/json'
+                    };
+                    queryModelList(baseUrl, headers);
+                }
+            });
+
+            function querySiliconFlowBalance(baseUrl, headers, keyIndex) {
+                return new Promise(function(resolve, reject) {
+                    $.ajax({
+                        url: baseUrl + "/v1/user/info",
+                        headers: headers,
+                        method: 'GET',
+                        success: function(response) {
+                            if (response.status && response.data) {
+                                var data = response.data;
+                                var resultHtml = "<h3>API密钥 #" + keyIndex + " (硅基流动)</h3>" +
+                                    "<table>" +
+                                    "<tr>" +
+                                    "<th>用户ID</th>" +
+                                    "<th>用户名</th>" +
+                                    "<th>邮箱</th>" +
+                                    "<th>余额(美元)</th>" +
+                                    "<th>充值余额(美元)</th>" +
+                                    "<th>总余额(美元)</th>" +
+                                    "</tr>" +
+                                    "<tr>" +
+                                    "<td>" + data.id + "</td>" +
+                                    "<td>" + data.name + "</td>" +
+                                    "<td>" + data.email + "</td>" +
+                                    "<td>" + data.balance + "</td>" +
+                                    "<td>" + data.chargeBalance + "</td>" +
+                                    "<td>" + data.totalBalance + "</td>" +
+                                    "</tr>" +
+                                    "</table>";
+                                resolve(resultHtml);
+                            } else {
+                                resolve("<p>API密钥 #" + keyIndex + " 余额查询失败：" + response.message + "</p>");
+                            }
+                        },
+                        error: function(error) {
+                            resolve("<p>API密钥 #" + keyIndex + " 余额查询出错：" + error.statusText + "</p>");
+                        }
+                    });
+                });
+            }
+
+            function queryOpenAIBalance(baseUrl, headers, keyIndex) {
+                var today = new Date();
+                var startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                var endDate = today.toISOString().split('T')[0];
+
+                return new Promise(function(resolve, reject) {
+                    $.when(
+                        $.ajax({
+                            url: baseUrl + "/v1/dashboard/billing/subscription",
+                            headers: headers,
+                            method: 'GET'
+                        }),
+                        $.ajax({
+                            url: baseUrl + "/v1/dashboard/billing/usage?start_date=" + startDate + "&end_date=" + endDate,
+                            headers: headers,
+                            method: 'GET'
+                        })
+                    ).then(function(subscriptionData, usageData) {
+                        var accountBalance = subscriptionData[0].soft_limit_usd || subscriptionData[0].hard_limit_usd || 0;
+                        var usedBalance = usageData[0].total_usage / 100;
+                        var remainingBalance = accountBalance - usedBalance;
+
+                        var resultHtml = "<h3>API密钥 #" + keyIndex + " (OpenAI)</h3>" +
+                            "<table>" +
+                            "<tr>" +
+                            "<th>是否已绑定支付方式</th>" +
+                            "<th>账户额度(美元)</th>" +
+                            "<th>已使用额度(美元)</th>" +
+                            "<th>剩余额度(美元)</th>" +
+                            "<th>API访问权限截止时间</th>" +
+                            "</tr>" +
+                            "<tr>" +
+                            "<td>" + (subscriptionData[0].has_payment_method ? "是" : "否") + "</td>" +
+                            "<td>" + accountBalance.toFixed(2) + "</td>" +
+                            "<td>" + usedBalance.toFixed(2) + "</td>" +
+                            "<td>" + remainingBalance.toFixed(2) + "</td>" +
+                            "<td>" + (subscriptionData[0].access_until ? new Date(subscriptionData[0].access_until * 1000).toLocaleString() : "无限制") + "</td>" +
+                            "</tr>" +
+                            "</table>";
+
+                        resolve(resultHtml);
+                    }).fail(function(error) {
+                        resolve("<p>API密钥 #" + keyIndex + " 查询出错：" + error.statusText + "</p>");
+                    });
+                });
+            }
+
+            function queryModelList(baseUrl, headers) {
+                $.ajax({
+                    url: baseUrl + "/v1/models",
+                    headers: headers,
+                    method: 'GET',
+                    success: function(response) {
+                        var modelCategories = {
+                            'OpenAI': [],
+                            'Claude': [],
+                            'Google': [],
+                            '零一万物': [],
+                            '千问': [],
+                            '智谱模型': [],
+                            'BAAI': [],
+                            'DeepSeek': [],
+                            'Intern': [],
+                            'Moonshot': [],
+                            'Llama': [],
+                            'Mistral': [],
+                            '向量模型': [],
+                            'Other': []
+                        };
+
+                        response.data.forEach(function(model) {
+                            var id = model.id.toLowerCase();
+                            if (id.includes('gpt') || id.includes('o1') || id.includes('tts')) {
+                                modelCategories['OpenAI'].push(model.id);
+                            } else if (id.includes('claude') || id.includes('anthropic')) {
+                                modelCategories['Claude'].push(model.id);
+                            } else if (id.includes('gemma') || id.includes('gemini')) {
+                                modelCategories['Google'].push(model.id);
+                            } else if (id.includes('yi-')) {
+                                modelCategories['零一万物'].push(model.id);
+                            } else if (id.includes('qwen')) {
+                                modelCategories['千问'].push(model.id);
+                            } else if (id.includes('glm')) {
+                                modelCategories['智谱模型'].push(model.id);
+                            } else if (id.includes('baai')) {
+                                modelCategories['BAAI'].push(model.id);
+                            } else if (id.includes('deepseek')) {
+                                modelCategories['DeepSeek'].push(model.id);
+                            } else if (id.includes('intern')) {
+                                modelCategories['Intern'].push(model.id);
+                            } else if (id.includes('moonshot') || id.includes('kimi')) {
+                                modelCategories['Moonshot'].push(model.id);
+                            } else if (id.includes('llama')) {
+                                modelCategories['Llama'].push(model.id);
+                            } else if (id.includes('mistral')) {
+                                modelCategories['Mistral'].push(model.id);
+                            } else if (id.includes('embedding')) {
+                                modelCategories['向量模型'].push(model.id);
+                            } else {
+                                modelCategories['Other'].push(model.id);
+                            }
+                        });
+
+                        var modelListHtml = "<h2>支持的模型列表（第一个key为准）</h2>";
+                        for (var category in modelCategories) {
+                            if (modelCategories[category].length > 0) {
+                                modelListHtml += "<div class='model-category'><h3>" + category + "</h3><div class='model-list'>";
+                                modelCategories[category].forEach(function(model) {
+                                    modelListHtml += "<span class='model-item' data-model='" + model + "'>" + model + "</span>";
+                                });
+                                modelListHtml += "</div></div>";
+                            }
+                        }
+                        $('#modelList').html(modelListHtml);
+
+                        // 为模型名称添加点击事件
+                        $('.model-item').click(function() {
+                            var modelName = $(this).data('model');
+                            navigator.clipboard.writeText(modelName).then(function() {
+                                showNotification();
+                            });
+                        });
+                    },
+                    error: function(error) {
+                        $('#modelList').html("<p>模型列表查询出错：" + error.statusText + "</p>");
+                    }
+                });
+            }
+
+            function showNotification() {
+                $('#copyNotification').fadeIn().delay(2000).fadeOut();
+            }
+        });
+    </script>
+</body>
+</html>
